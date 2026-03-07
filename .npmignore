@@ -1,0 +1,9 @@
+src/
+.gitignore
+tsconfig.json
+tsup.config.ts
+.claude/
+*.log
+.DS_Store
+install.sh
+install.ps1
