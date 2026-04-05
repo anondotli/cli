@@ -329,20 +329,9 @@ export const dropUploadCommand = new Command("upload")
             );
 
             const presignedUrl = uploadUrls[String(chunkIndex + 1)];
-            let url = presignedUrl;
-            const headers: Record<string, string> = {};
 
-            if (url.includes("/relay/") && url.includes("?")) {
-              const splitIndex = url.indexOf("?");
-              const baseUrl = url.slice(0, splitIndex);
-              const query = url.slice(splitIndex + 1);
-              url = baseUrl;
-              headers["X-Relay-Query"] = query;
-            }
-
-            const uploadRes = await apiRawFetch(url, {
+            const uploadRes = await apiRawFetch(presignedUrl, {
               method: "PUT",
-              headers,
               body: new Uint8Array(encrypted),
             });
 

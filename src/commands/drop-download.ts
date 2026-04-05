@@ -5,7 +5,7 @@ import * as crypto from "../lib/crypto.js";
 import * as ui from "../lib/ui.js";
 import { AUTH_TAG_SIZE, MIN_CHUNK_SIZE } from "../lib/constants.js";
 import { EXIT_NOT_FOUND } from "../lib/errors.js";
-import type { DropMetadata } from "../types/api.js";
+import type { DropMetadata, BatchDownloadResponse } from "../types/api.js";
 import { getBaseUrl } from "../lib/config.js";
 import { parseDropIdentifier } from "../lib/drop-url.js";
 
@@ -120,6 +120,32 @@ export const dropDownloadCommand = new Command("download")
       const outDir = path.resolve(options.output as string);
       fs.mkdirSync(outDir, { recursive: true });
 
+      // Fetch presigned download URLs for all files in one request (counts as 1 download)
+      const batchSpin = ui.spinner("Preparing download...");
+      let downloadUrls: Record<string, string> | null = null;
+
+      try {
+        const batchRes = await fetch(`${baseUrl}/api/v1/drop/${dropId}/download`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        });
+
+        if (batchRes.ok) {
+          const batchData = (await batchRes.json()) as BatchDownloadResponse;
+          downloadUrls = batchData.downloadUrls;
+          batchSpin.succeed("Download URLs ready");
+        } else {
+          const errBody = await batchRes.json().catch(() => ({ error: "Unknown error" }));
+          const errMsg = (errBody as { error?: string })?.error || batchRes.statusText;
+          batchSpin.fail(`Download failed: ${errMsg}`);
+          process.exit(batchRes.status === 404 ? EXIT_NOT_FOUND : 1);
+        }
+      } catch (err) {
+        batchSpin.fail("Failed to prepare download");
+        ui.error(err instanceof Error ? err.message : "Network error");
+        process.exit(1);
+      }
+
       // Download and decrypt each file
       let downloadedCount = 0;
       for (const file of drop.files) {
@@ -167,10 +193,21 @@ export const dropDownloadCommand = new Command("download")
 
         ui.info(`Downloading ${ui.c.accent(filename)} (${ui.formatBytes(expectedDecryptedSize)})`);
 
-        const downloadUrl = `${baseUrl}/api/v1/drop/${dropId}/file/${file.id}`;
+        // Fresh download: use presigned URL from batch response (already counted)
+        // Resume: use per-file API endpoint with Range header (skips count increment)
+        let downloadUrl: string;
         const fetchHeaders: Record<string, string> = {};
+
         if (resumeFromByte > 0) {
+          downloadUrl = `${baseUrl}/api/v1/drop/${dropId}/file/${file.id}`;
           fetchHeaders["Range"] = `bytes=${resumeFromByte}-`;
+        } else {
+          const presigned = downloadUrls![file.id];
+          if (!presigned) {
+            ui.error(`No download URL for file ${file.id} — skipping`);
+            continue;
+          }
+          downloadUrl = presigned;
         }
 
         const response = await fetch(downloadUrl, { headers: fetchHeaders });

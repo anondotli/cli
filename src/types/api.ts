@@ -165,3 +165,8 @@ export interface ApiKeyCreateResponse {
   label: string | null;
   created_at: string;
 }
+
+export interface BatchDownloadResponse {
+  success: boolean;
+  downloadUrls: Record<string, string>;
+}
