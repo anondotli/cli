@@ -10,7 +10,6 @@ import type {
 
 // Actionable messages for known API error codes (U4)
 const CODE_MESSAGES: Record<string, string> = {
-  NOT_FOUND: "Resource not found — it may have expired or been deleted",
   QUOTA_EXCEEDED: "Storage limit reached — upgrade at anon.li/dashboard",
   FORBIDDEN: "This feature requires a paid plan — see `anonli subscribe`",
   UNAUTHORIZED: "Invalid or expired API key — run `anonli login` to re-authenticate",
@@ -58,7 +57,10 @@ async function handleError(res: Response): Promise<never> {
       (body && "error" in body && typeof body.error === "string"
         ? body.error
         : (body as ApiErrorResponse)?.error?.message) || "Unauthorized";
-    throw new AuthError(CODE_MESSAGES["UNAUTHORIZED"] ?? rawMsg);
+    const message = rawMsg === "Unauthorized"
+      ? (CODE_MESSAGES["UNAUTHORIZED"] ?? rawMsg)
+      : rawMsg;
+    throw new AuthError(message);
   }
 
   if (res.status === 429) {

@@ -5,14 +5,14 @@ import * as ui from "../lib/ui.js";
 export const aliasDeleteCommand = new Command("delete")
   .alias("rm")
   .description("Delete an alias")
-  .argument("<id>", "Alias ID or email")
+  .argument("<alias>", "Alias email address")
   .option("-f, --force", "Skip confirmation")
-  .action(async (id: string, options: { force?: boolean }) => {
+  .action(async (alias: string, options: { force?: boolean }) => {
     requireAuth();
 
     if (!options.force) {
       const confirmed = await ui.confirm(
-        `Delete alias ${ui.bold(id)}?`
+        `Delete alias ${ui.bold(alias)}?`
       );
       if (!confirmed) {
         ui.info("Cancelled.");
@@ -23,8 +23,8 @@ export const aliasDeleteCommand = new Command("delete")
     const spin = ui.spinner("Deleting alias...");
 
     try {
-      const result = await apiDelete(`/api/v1/alias/${encodeURIComponent(id)}`);
-      spin.succeed(`Deleted alias ${id}`);
+      const result = await apiDelete(`/api/v1/alias/${encodeURIComponent(alias)}`);
+      spin.succeed(`Deleted alias ${alias}`);
       ui.showRateLimit(result.rateLimit);
     } catch (err) {
       spin.fail("Failed to delete alias.");

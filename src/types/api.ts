@@ -66,8 +66,9 @@ export interface MeResponse {
 
 export interface CreateDropResponse {
   drop_id: string;
-  session_token: string | null;
   expires_at: string | null;
+  owner_key_stored?: boolean;
+  session_token?: string | null;
 }
 
 export interface AddFileResponse {
@@ -122,6 +123,11 @@ export interface AliasItem {
   email: string;
   active: boolean;
   description: string | null;
+  label?: string | null;
+  note?: string | null;
+  encrypted_label?: string | null;
+  encrypted_note?: string | null;
+  metadata_version?: number;
   created_at: string;
   updated_at: string;
 }
@@ -169,4 +175,17 @@ export interface ApiKeyCreateResponse {
 export interface BatchDownloadResponse {
   success: boolean;
   downloadUrls: Record<string, string>;
+}
+
+export interface VaultBootstrapResponse {
+  authSalt: string;
+  kdfVersion: number;
+}
+
+export interface VaultUnlockResponse {
+  vault_id: string;
+  vault_generation: number;
+  vault_salt: string;
+  password_wrapped_vault_key: string;
+  kdf_version: number;
 }

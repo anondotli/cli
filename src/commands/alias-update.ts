@@ -1,20 +1,65 @@
 import { Command } from "commander";
-import { requireAuth, apiPatch } from "../lib/api.js";
+import { requireAuth, apiGet, apiPatch } from "../lib/api.js";
+import { encryptAliasMetadata, unlockVault } from "../lib/vault.js";
 import * as ui from "../lib/ui.js";
 import type { AliasItem } from "../types/api.js";
+
+const MAX_ALIAS_LABEL_LENGTH = 50;
+const MAX_ALIAS_NOTE_LENGTH = 500;
+
+function validateMetadataOptions(options: {
+  label?: string;
+  note?: string;
+  clearLabel?: boolean;
+  clearNote?: boolean;
+}): void {
+  if (options.label !== undefined && options.clearLabel) {
+    ui.error("Cannot use both --label and --clear-label");
+    process.exit(1);
+  }
+  if (options.note !== undefined && options.clearNote) {
+    ui.error("Cannot use both --note and --clear-note");
+    process.exit(1);
+  }
+  if (options.label !== undefined && options.label.length > MAX_ALIAS_LABEL_LENGTH) {
+    ui.error(`Alias label must be ${MAX_ALIAS_LABEL_LENGTH} characters or fewer.`);
+    process.exit(1);
+  }
+  if (options.note !== undefined && options.note.length > MAX_ALIAS_NOTE_LENGTH) {
+    ui.error(`Alias note must be ${MAX_ALIAS_NOTE_LENGTH} characters or fewer.`);
+    process.exit(1);
+  }
+}
 
 export const aliasUpdateCommand = new Command("update")
   .alias("edit")
   .description("Update an alias")
-  .argument("<id>", "Alias ID or email")
+  .argument("<alias>", "Alias email address")
   .option("--enable", "Enable the alias")
   .option("--disable", "Disable the alias")
-  .option("-l, --label <text>", "Update description/label")
-  .action(async (aliasId: string, options: { enable?: boolean; disable?: boolean; label?: string }) => {
+  .option("-l, --label <text>", "Update encrypted label")
+  .option("--note <text>", "Update encrypted private note")
+  .option("--clear-label", "Clear encrypted label")
+  .option("--clear-note", "Clear encrypted private note")
+  .action(async (alias: string, options: {
+    enable?: boolean;
+    disable?: boolean;
+    label?: string;
+    note?: string;
+    clearLabel?: boolean;
+    clearNote?: boolean;
+  }) => {
     requireAuth();
 
-    if (!options.enable && !options.disable && !options.label) {
-      ui.error("Provide at least one option: --enable, --disable, or --label");
+    if (
+      !options.enable &&
+      !options.disable &&
+      options.label === undefined &&
+      options.note === undefined &&
+      !options.clearLabel &&
+      !options.clearNote
+    ) {
+      ui.error("Provide at least one option: --enable, --disable, --label, --note, --clear-label, or --clear-note");
       process.exit(1);
     }
 
@@ -22,11 +67,13 @@ export const aliasUpdateCommand = new Command("update")
       ui.error("Cannot use both --enable and --disable");
       process.exit(1);
     }
+    validateMetadataOptions(options);
 
-    const spin = ui.spinner("Updating alias...");
+    let spin: ReturnType<typeof ui.spinner> | null = null;
 
     try {
       const body: Record<string, unknown> = {};
+      let resolvedAlias = alias;
 
       if (options.enable) {
         body.active = true;
@@ -34,12 +81,38 @@ export const aliasUpdateCommand = new Command("update")
         body.active = false;
       }
 
-      if (options.label !== undefined) {
-        body.description = options.label;
+      const needsEncryption = options.label !== undefined || options.note !== undefined;
+      if (needsEncryption) {
+        const current = await apiGet<AliasItem>(
+          `/api/v1/alias/${encodeURIComponent(alias)}`
+        );
+        resolvedAlias = current.data.id;
+        const vault = await unlockVault();
+
+        if (options.label !== undefined) {
+          body.encrypted_label = await encryptAliasMetadata(options.label, vault, {
+            aliasId: current.data.id,
+            field: "label",
+          });
+        }
+        if (options.note !== undefined) {
+          body.encrypted_note = await encryptAliasMetadata(options.note, vault, {
+            aliasId: current.data.id,
+            field: "note",
+          });
+        }
       }
 
+      if (options.clearLabel) {
+        body.encrypted_label = null;
+      }
+      if (options.clearNote) {
+        body.encrypted_note = null;
+      }
+
+      spin = ui.spinner("Updating alias...");
       const result = await apiPatch<AliasItem>(
-        `/api/v1/alias/${encodeURIComponent(aliasId)}`,
+        `/api/v1/alias/${encodeURIComponent(resolvedAlias)}`,
         body
       );
       spin.stop();
@@ -53,13 +126,26 @@ export const aliasUpdateCommand = new Command("update")
         `${ui.c.accent(result.data.email)} is now ${status}`
       );
 
-      if (result.data.description) {
-        ui.info(`Label: ${result.data.description}`);
+      if (options.label !== undefined) {
+        ui.info("Encrypted label saved.");
+      }
+      if (options.note !== undefined) {
+        ui.info("Encrypted note saved.");
+      }
+      if (options.clearLabel) {
+        ui.info("Encrypted label cleared.");
+      }
+      if (options.clearNote) {
+        ui.info("Encrypted note cleared.");
       }
 
       ui.showRateLimit(result.rateLimit);
     } catch (err) {
-      spin.fail("Failed to update alias.");
+      if (spin) {
+        spin.fail("Failed to update alias.");
+      } else {
+        ui.error("Failed to update alias.");
+      }
       ui.error(err instanceof Error ? err.message : "Unknown error");
       process.exit(1);
     }

@@ -56,11 +56,9 @@ export const dropInfoCommand = new Command("info")
 
       // Try to import the decryption key
       let cryptoKey: Awaited<ReturnType<typeof crypto.importKey>> | null = null;
-      let iv: Uint8Array | null = null;
       if (keyString) {
         try {
           cryptoKey = await crypto.importKey(keyString);
-          iv = new Uint8Array(crypto.base64UrlToArrayBuffer(drop.iv));
         } catch {
           ui.warn("Invalid decryption key — showing file IDs instead of names.");
         }
@@ -86,7 +84,7 @@ export const dropInfoCommand = new Command("info")
         ui.spacer();
         ui.sectionTitle("Files");
 
-        const canDecrypt = cryptoKey !== null && iv !== null;
+        const canDecrypt = cryptoKey !== null;
         const headers = ["#", canDecrypt ? "Name" : "ID", "Size", "Type"];
         const rows: string[][] = [];
 
@@ -94,9 +92,12 @@ export const dropInfoCommand = new Command("info")
           const file = drop.files[i];
           let nameOrId: string;
 
-          if (cryptoKey && iv) {
+          if (cryptoKey) {
             try {
-              nameOrId = await crypto.decryptFilename(file.encryptedName, cryptoKey, iv);
+              const fileIv = new Uint8Array(
+                crypto.base64UrlToArrayBuffer(file.iv || drop.iv)
+              );
+              nameOrId = await crypto.decryptFilename(file.encryptedName, cryptoKey, fileIv);
             } catch {
               nameOrId = file.id.slice(0, 8) + "...";
             }

@@ -45,7 +45,7 @@ export async function generateKey(): Promise<string> {
 }
 
 export async function importKey(keyString: string): Promise<WebCryptoKey> {
-  const keyData = base64UrlToArrayBuffer(keyString);
+  const keyData = extractStoredKeyMaterial(keyString);
   return subtle.importKey("raw", keyData, ALGORITHM, true, [
     "encrypt",
     "decrypt",
@@ -226,6 +226,10 @@ function generateBaseIv(): string {
   return arrayBufferToBase64Url(iv);
 }
 
+export function generateFileIv(): string {
+  return generateBaseIv();
+}
+
 function generateSalt(): string {
   const salt = getRandomValues(new Uint8Array(SALT_LENGTH));
   return arrayBufferToBase64Url(salt);
@@ -284,4 +288,16 @@ export function base64UrlToArrayBuffer(base64url: string): ArrayBuffer {
   }
   const buf = Buffer.from(base64, "base64");
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
+}
+
+export function extractStoredKeyMaterial(keyString: string): ArrayBuffer {
+  const encoded = keyString.startsWith("derived:")
+    ? keyString.split(":")[2] ?? ""
+    : keyString;
+
+  if (!encoded) {
+    throw new Error("Invalid encryption key");
+  }
+
+  return base64UrlToArrayBuffer(encoded);
 }

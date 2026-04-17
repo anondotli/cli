@@ -6,6 +6,7 @@ import { requireAuth, apiFetch, apiRawFetch } from "../lib/api.js";
 import { fetchPlanInfo, assertFeature, assertStorageLimit, warnExpiryCap } from "../lib/limits.js";
 import { getBaseUrl } from "../lib/config.js";
 import * as crypto from "../lib/crypto.js";
+import { unlockVault, wrapDropKeyWithVault, type UnlockedVault } from "../lib/vault.js";
 import * as ui from "../lib/ui.js";
 import { lookup } from "mime-types";
 import type {
@@ -70,6 +71,26 @@ function checkPasswordStrength(password: string): void {
   }
 }
 
+async function uploadEncryptedChunk(
+  presignedUrl: string,
+  encrypted: ArrayBuffer
+): Promise<Response> {
+  let url = presignedUrl;
+  const headers: Record<string, string> = {};
+
+  if (url.includes("/relay/") && url.includes("?")) {
+    const splitIndex = url.indexOf("?");
+    headers["X-Relay-Query"] = url.slice(splitIndex + 1);
+    url = url.slice(0, splitIndex);
+  }
+
+  return apiRawFetch(url, {
+    method: "PUT",
+    headers,
+    body: new Uint8Array(encrypted),
+  });
+}
+
 export const dropUploadCommand = new Command("upload")
   .argument("[path]", "File or folder to upload (omit to read from stdin)")
   .description("Create an encrypted drop")
@@ -81,6 +102,7 @@ export const dropUploadCommand = new Command("upload")
   .option("--name <filename>", "Filename when reading from stdin")
   .option("--hide-branding", "Hide anon.li branding on download page")
   .option("--notify", "Send email notification when files are downloaded")
+  .option("--no-vault", "Do not store the drop key in your vault")
   .action(async (inputPath: string | undefined, options: {
     title?: string;
     message?: string;
@@ -90,6 +112,7 @@ export const dropUploadCommand = new Command("upload")
     name?: string;
     hideBranding?: boolean;
     notify?: boolean;
+    vault?: boolean;
   }) => {
     requireAuth();
 
@@ -166,10 +189,20 @@ export const dropUploadCommand = new Command("upload")
       options.expiry = warnExpiryCap(options.expiry, plan.limits.max_expiry_days);
     }
 
+    const useVault = options.vault !== false;
     try {
+      let vault: UnlockedVault | null = null;
+      if (useVault) {
+        ui.info("Unlock your vault to store the drop recovery key.");
+        vault = await unlockVault();
+      }
+
       // 1. Generate encryption context
       const ctx = await crypto.createEncryptionContext();
       const { key, keyString, baseIv, ivString } = ctx;
+      const wrappedOwnerKey = vault
+        ? await wrapDropKeyWithVault(keyString, vault)
+        : undefined;
 
       // 2. Handle password protection
       let customKey = false;
@@ -220,6 +253,13 @@ export const dropUploadCommand = new Command("upload")
           ...(options.maxDownloads && { maxDownloads: options.maxDownloads }),
           ...(options.hideBranding && { hideBranding: true }),
           ...(options.notify && { notifyOnDownload: true }),
+          ...(vault && wrappedOwnerKey && {
+            ownerKey: {
+              wrappedKey: wrappedOwnerKey,
+              vaultId: vault.vaultId,
+              vaultGeneration: vault.vaultGeneration,
+            },
+          }),
           ...(customKey && {
             customKey: true,
             salt,
@@ -243,8 +283,7 @@ export const dropUploadCommand = new Command("upload")
       const createData = (await createRes.json()) as {
         data: CreateDropResponse;
       };
-      const { drop_id: dropId, session_token: sessionToken } =
-        createData.data;
+      const { drop_id: dropId, owner_key_stored: ownerKeyStored } = createData.data;
       createSpin.succeed(`Drop created: ${dropId}`);
 
       // 5. Upload each file
@@ -261,11 +300,14 @@ export const dropUploadCommand = new Command("upload")
           chunkSize
         );
 
+        const fileIvString = crypto.generateFileIv();
+        const fileIv = new Uint8Array(crypto.base64UrlToArrayBuffer(fileIvString));
+
         // Encrypt filename
         const encryptedName = await crypto.encryptFilename(
           file.relativeName,
           key,
-          baseIv
+          fileIv
         );
 
         // Add file to drop
@@ -274,11 +316,10 @@ export const dropUploadCommand = new Command("upload")
           body: JSON.stringify({
             size: encryptedSize,
             encryptedName,
-            iv: ivString,
+            iv: fileIvString,
             mimeType: lookup(file.absolutePath) || "application/octet-stream",
             chunkCount,
             chunkSize,
-            ...(sessionToken && { sessionToken }),
           }),
         });
 
@@ -324,16 +365,13 @@ export const dropUploadCommand = new Command("upload")
                 buffer.byteOffset + buffer.byteLength
               ),
               key,
-              baseIv,
+              fileIv,
               chunkIndex
             );
 
             const presignedUrl = uploadUrls[String(chunkIndex + 1)];
 
-            const uploadRes = await apiRawFetch(presignedUrl, {
-              method: "PUT",
-              body: new Uint8Array(encrypted),
-            });
+            const uploadRes = await uploadEncryptedChunk(presignedUrl, encrypted);
 
             if (!uploadRes.ok) {
               throw new Error(
@@ -388,7 +426,6 @@ export const dropUploadCommand = new Command("upload")
           method: "PATCH",
           body: JSON.stringify({
             files: fileChunkRecords,
-            ...(sessionToken && { sessionToken }),
           }),
         }
       );
@@ -427,6 +464,7 @@ export const dropUploadCommand = new Command("upload")
       if (options.notify) {
         boxLines.push(`${ui.c.secondary("Notifications:")} ${ui.c.accent("enabled")}`);
       }
+      boxLines.push(`${ui.c.secondary("Vault:")} ${ownerKeyStored ? ui.c.success("owner key stored") : ui.c.muted("not stored")}`);
 
       ui.successBox("Drop Created", boxLines.join("\n"));
       ui.spacer();
@@ -436,6 +474,11 @@ export const dropUploadCommand = new Command("upload")
         );
       } else {
         ui.info("Password-protected. Share the URL and password separately.");
+      }
+      if (!useVault) {
+        ui.warn("Vault storage disabled. The dashboard cannot recover this drop key.");
+      } else if (!ownerKeyStored) {
+        ui.warn("The API did not confirm vault owner-key storage for this drop.");
       }
     } catch (err) {
       ui.error(err instanceof Error ? err.message : "Upload failed");

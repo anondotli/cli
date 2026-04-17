@@ -15,7 +15,7 @@ export async function runAuthFlow(token?: string): Promise<boolean> {
 
   if (!apiKey) {
     ui.info(
-      `Get your API key from ${ui.link("https://anon.li/dashboard/settings/api")}`
+      `Get your API key from ${ui.link("https://anon.li/dashboard/api-keys")}`
     );
     ui.spacer();
     apiKey = await ui.prompt("API key:", { mask: true });
@@ -30,7 +30,7 @@ export async function runAuthFlow(token?: string): Promise<boolean> {
     ui.errorBox(
       "Invalid Key",
       'API keys start with "ak_".',
-      "Get your key at https://anon.li/dashboard/settings/api"
+      "Get your key at https://anon.li/dashboard/api-keys"
     );
     return false;
   }
@@ -58,7 +58,7 @@ export async function runAuthFlow(token?: string): Promise<boolean> {
     ui.errorBox(
       "Authentication Failed",
       err instanceof Error ? err.message : "Invalid API key.",
-      "Get your key at https://anon.li/dashboard/settings/api"
+      "Get your key at https://anon.li/dashboard/api-keys"
     );
     return false;
   }

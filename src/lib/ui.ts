@@ -16,6 +16,7 @@ export { c, brandColor } from "./theme.js";
 // ─── Quiet Mode (U2) ──────────────────────────────────────
 
 let _quiet = false;
+const UNLIMITED_SYMBOL = "∞";
 
 export function setQuiet(val: boolean): void {
   _quiet = val;
@@ -255,7 +256,14 @@ export function prompt(
 
 // ─── Usage Bars ──────────────────────────────────────────
 
+function isUnlimitedLimit(limit: number): boolean {
+  return !Number.isFinite(limit) || limit < 0;
+}
+
 export function usageBar(used: number, limit: number, width = 12): string {
+  if (isUnlimitedLimit(limit)) {
+    return c.success("░".repeat(width));
+  }
   if (limit === 0) {
     return used > 0 ? c.error("▓".repeat(width)) : c.subtle("░".repeat(width));
   }
@@ -289,8 +297,9 @@ export function usageRow(
   }
 
   const bar = usageBar(used, limit, barWidth);
-  const count = `${used}/${limit}`;
-  const overLimit = used > limit;
+  const unlimited = isUnlimitedLimit(limit);
+  const count = unlimited ? `${used}/${UNLIMITED_SYMBOL}` : `${used}/${limit}`;
+  const overLimit = !unlimited && used > limit;
   const countStr = overLimit ? c.error(count) : c.primary(count);
   const warnStr = overLimit ? " " + c.warning("▲") : "";
   console.log(`${pad}${paddedLabel} ${bar}  ${countStr}${warnStr}`);
@@ -308,8 +317,9 @@ export function storageRow(
   const pad = "  ";
   const paddedLabel = c.secondary((label + ":").padEnd(labelWidth));
   const bar = usageBar(used, limit, barWidth);
+  const limitLabel = isUnlimitedLimit(limit) ? UNLIMITED_SYMBOL : formatBytes(limit);
   console.log(
-    `${pad}${paddedLabel} ${bar}  ${c.primary(formatBytes(used))}${c.muted("/")}${c.primary(formatBytes(limit))}`
+    `${pad}${paddedLabel} ${bar}  ${c.primary(formatBytes(used))}${c.muted("/")}${c.primary(limitLabel)}`
   );
 }
 
@@ -427,6 +437,7 @@ export function updateNotice(current: string, latest: string): void {
 // ─── Formatters ───────────────────────────────────────────
 
 export function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes < 0) return UNLIMITED_SYMBOL;
   if (bytes === 0) return "0 B";
   const k = 1024;
   const sizes = ["B", "KB", "MB", "GB", "TB"];

@@ -10,6 +10,7 @@ The official CLI for [anon.li](https://anon.li). Share files with end-to-end enc
 ## Features
 
 - **End-to-End Encryption**: Files are encrypted on your machine before upload. We never see your data.
+- **Vault Recovery**: Drop owner keys and alias metadata can be encrypted with your account vault.
 - **Anonymous File Drops**: Create expiring, password-protected file drops.
 - **Email Aliases**: Generate and manage anonymous email aliases to protect your identity.
 - **Custom Domains**: Use your own domains for email aliases.
@@ -52,7 +53,7 @@ Once installed, authenticate with your anon.li account:
 anonli login
 ```
 
-This will open a browser window to authorize the CLI. If you're on a headless server, you can set the `ANONLI_API_KEY` environment variable instead.
+This prompts for an API key from your dashboard. If you're on a headless server, you can set the `ANONLI_API_KEY` environment variable instead.
 
 ## Usage
 
@@ -74,11 +75,14 @@ anonli drop upload ./secret-documents
 - `-p, --password <pass>`: Password-protect the drop (requires specific plan).
 - `--notify`: Get an email notification when files are downloaded.
 - `--hide-branding`: Remove anon.li branding from the download page.
+- `--no-vault`: Skip storing the owner key in your account vault.
 
 Example:
 ```bash
 anonli drop upload ./report.pdf --expiry 7 --password "hunter2" --notify
 ```
+
+By default, uploads prompt for your vault password and store a vault-wrapped owner key so the dashboard can recover the share link. The vault password is never accepted as a command-line flag or environment variable and is not written to CLI config. Use `--no-vault` only when you intentionally want a link-only drop.
 
 #### List Your Drops
 
@@ -126,7 +130,8 @@ anonli alias new --custom my-alias --domain anon.li
 ```
 
 **Options:**
-- `--label <text>`: Add a description/label to remember what this alias is for.
+- `--label <text>`: Add a vault-encrypted label to remember what this alias is for.
+- `--note <text>`: Add a vault-encrypted private note.
 - `--recipient <id>`: Forward emails to a specific recipient ID.
 
 #### List Aliases

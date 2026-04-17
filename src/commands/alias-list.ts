@@ -61,10 +61,9 @@ export const aliasListCommand = new Command("list")
       }
 
       ui.table(
-        ["Email", "ID", "Status", "Created"],
+        ["Alias", "Status", "Created"],
         data.map((a) => [
           a.email,
-          a.id.slice(0, 8) + "...",
           a.active
             ? ui.statusBadge("Active", "active")
             : ui.statusBadge("Inactive", "inactive"),

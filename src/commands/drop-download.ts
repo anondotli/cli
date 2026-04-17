@@ -110,11 +110,8 @@ export const dropDownloadCommand = new Command("download")
         return;
       }
 
-      // Import key and IV
+      // Import key
       const key = await crypto.importKey(keyString);
-      const iv = new Uint8Array(
-        crypto.base64UrlToArrayBuffer(drop.iv)
-      );
 
       // Create output directory
       const outDir = path.resolve(options.output as string);
@@ -149,13 +146,17 @@ export const dropDownloadCommand = new Command("download")
       // Download and decrypt each file
       let downloadedCount = 0;
       for (const file of drop.files) {
+        const fileIv = new Uint8Array(
+          crypto.base64UrlToArrayBuffer(file.iv || drop.iv)
+        );
+
         // B1: Warn on filename decryption failure
         let filename: string;
         try {
           filename = await crypto.decryptFilename(
             file.encryptedName,
             key,
-            iv
+            fileIv
           );
         } catch {
           ui.warn(`Could not decrypt filename for file ${file.id.slice(0, 8)} — using fallback name`);
@@ -269,7 +270,7 @@ export const dropDownloadCommand = new Command("download")
                   encryptedChunk.byteOffset + encryptedChunk.byteLength
                 ),
                 key,
-                iv,
+                fileIv,
                 chunkIndex
               );
 
@@ -291,7 +292,7 @@ export const dropDownloadCommand = new Command("download")
                     buffer.byteOffset + buffer.byteLength
                   ),
                   key,
-                  iv,
+                  fileIv,
                   chunkIndex
                 );
                 writeStream.write(Buffer.from(decrypted));

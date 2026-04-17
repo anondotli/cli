@@ -11,20 +11,20 @@ interface AliasWithStats extends AliasItem {
 
 export const aliasStatsCommand = new Command("stats")
   .description("Show forwarding statistics for an alias")
-  .argument("[alias-id]", "Alias ID (omit to show summary across all aliases)")
+  .argument("[alias]", "Alias email address (omit to show summary across all aliases)")
   .option("--all", "Show summary across all aliases")
   // U1: JSON output
   .option("--json", "Output raw JSON")
-  .action(async (aliasId: string | undefined, options: { all?: boolean; json?: boolean }) => {
+  .action(async (alias: string | undefined, options: { all?: boolean; json?: boolean }) => {
     requireAuth();
 
-    if (aliasId && !options.all) {
+    if (alias && !options.all) {
       // Single alias stats
       const spin = ui.spinner("Fetching alias stats...");
 
       try {
         const result = await apiGet<AliasWithStats>(
-          `/api/v1/alias/${encodeURIComponent(aliasId)}`
+          `/api/v1/alias/${encodeURIComponent(alias)}`
         );
         spin.stop();
 
@@ -37,7 +37,6 @@ export const aliasStatsCommand = new Command("stats")
 
         ui.header(`Alias: ${a.email}`);
         ui.spacer();
-        ui.keyValue("ID", a.id);
         ui.keyValue("Status", a.active ? "Active" : "Inactive");
         ui.keyValue("Forwarded", String(a.forwarded ?? 0));
         ui.keyValue("Blocked", String(a.blocked ?? 0));
