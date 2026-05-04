@@ -40,7 +40,7 @@ export interface MeResponse {
   email: string;
   name: string | null;
   tier: "free" | "plus" | "pro";
-  product: "bundle" | "alias" | "drop" | null;
+  product: "bundle" | "alias" | "drop" | "form" | null;
   created_at: string;
   aliases: {
     random: { used: number; limit: number };
@@ -62,6 +62,7 @@ export interface MeResponse {
     downloadNotifications: boolean;
     filePreview: boolean;
   };
+  vault_configured: boolean;
 }
 
 export interface CreateDropResponse {
@@ -94,7 +95,7 @@ export interface DropMetadata {
   files: DropFileMetadata[];
 }
 
-export interface DropFileMetadata {
+interface DropFileMetadata {
   id: string;
   encryptedName: string;
   size: string;
@@ -188,4 +189,58 @@ export interface VaultUnlockResponse {
   vault_salt: string;
   password_wrapped_vault_key: string;
   kdf_version: number;
+}
+
+export interface VaultDropKeyEntry {
+  drop_id: string;
+  wrapped_key: string;
+  vault_generation: number;
+}
+
+export interface FormSummary {
+  id: string;
+  title: string;
+  description: string | null;
+  active: boolean;
+  disabled_by_user: boolean;
+  taken_down: boolean;
+  allow_file_uploads: boolean;
+  submissions_count: number;
+  max_submissions: number | null;
+  closes_at: string | null;
+  hide_branding: boolean;
+  notify_on_submission: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FormPublicView {
+  id: string;
+  title: string;
+  description: string | null;
+  schema: unknown;
+  public_key: string;
+  custom_key: boolean;
+  salt: string | null;
+  custom_key_data: string | null;
+  custom_key_iv: string | null;
+  active: boolean;
+  hide_branding: boolean;
+  closes_at: string | null;
+  allow_file_uploads: boolean;
+  max_file_size_override: number | null;
+}
+
+export interface CreateFormResponse {
+  id: string;
+  title: string;
+  public_key: string;
+  created_at: string;
+}
+
+export interface FormSubmissionSummary {
+  id: string;
+  created_at: string;
+  read_at: string | null;
+  has_attached_drop: boolean;
 }

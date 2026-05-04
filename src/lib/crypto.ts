@@ -26,7 +26,7 @@ const getRandomValues = webcrypto.getRandomValues.bind(webcrypto);
 
 const ALGORITHM = { name: "AES-GCM", length: 256 };
 
-export interface EncryptionContext {
+interface EncryptionContext {
   key: WebCryptoKey;
   keyString: string;
   baseIv: Uint8Array;
@@ -35,7 +35,7 @@ export interface EncryptionContext {
 
 // ── Key management ──────────────────────────────────────────────────
 
-export async function generateKey(): Promise<string> {
+async function generateKey(): Promise<string> {
   const key = await subtle.generateKey(ALGORITHM, true, [
     "encrypt",
     "decrypt",
@@ -56,15 +56,6 @@ export async function createEncryptionContext(): Promise<EncryptionContext> {
   const keyString = await generateKey();
   const key = await importKey(keyString);
   const ivString = generateBaseIv();
-  const baseIv = new Uint8Array(base64UrlToArrayBuffer(ivString));
-  return { key, keyString, baseIv, ivString };
-}
-
-export async function restoreEncryptionContext(
-  keyString: string,
-  ivString: string
-): Promise<EncryptionContext> {
-  const key = await importKey(keyString);
   const baseIv = new Uint8Array(base64UrlToArrayBuffer(ivString));
   return { key, keyString, baseIv, ivString };
 }
@@ -172,6 +163,35 @@ export async function decryptKeyWithPassword(
   );
 
   return new TextDecoder().decode(decrypted);
+}
+
+// ── Form submission asymmetric crypto ───────────────────────────────
+//
+// Mirrors lib/crypto/asymmetric.ts in the anon.li app. Form creator
+// generates a P-256 ECDH keypair: the public key lives on the form, the
+// private key is wrapped with the vault key (see vault.wrapVaultPayload)
+// and stored in FormOwnerKey. Submissions arrive as { ephemeralPubKey, iv,
+// encryptedPayload } and decrypt via ECDH + HKDF-SHA256 + AES-256-GCM.
+
+const ECDH_PARAMS: webcrypto.EcKeyGenParams = { name: "ECDH", namedCurve: "P-256" };
+
+interface FormKeypairExport {
+  publicKey: string;   // base64url raw (65-byte uncompressed P-256)
+  privateKey: string;  // base64url PKCS#8
+}
+
+export async function generateFormKeypair(): Promise<FormKeypairExport> {
+  const pair = (await subtle.generateKey(ECDH_PARAMS, true, [
+    "deriveBits",
+  ])) as webcrypto.CryptoKeyPair;
+  const [pub, priv] = await Promise.all([
+    subtle.exportKey("raw", pair.publicKey),
+    subtle.exportKey("pkcs8", pair.privateKey),
+  ]);
+  return {
+    publicKey: arrayBufferToBase64Url(pub),
+    privateKey: arrayBufferToBase64Url(priv),
+  };
 }
 
 // ── Chunk sizing ────────────────────────────────────────────────────

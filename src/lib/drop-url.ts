@@ -1,4 +1,4 @@
-export interface DropIdentifier {
+interface DropIdentifier {
   dropId: string;
   key: string | null;
 }

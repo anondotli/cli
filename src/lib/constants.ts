@@ -1,8 +1,8 @@
 /** 1 Megabyte in bytes */
-export const MB = 1024 * 1024;
+const MB = 1024 * 1024;
 
 /** 1 Gigabyte in bytes */
-export const GB = 1024 * MB;
+const GB = 1024 * MB;
 
 /** Maximum chunks per file */
 export const MAX_CHUNKS_PER_FILE = 100;
@@ -37,3 +37,6 @@ export const MAX_RETRIES = 3;
 
 /** Base delay for exponential backoff (ms) */
 export const RETRY_BASE_DELAY = 1000;
+
+/** AAD for vault-wrapped form private keys. */
+export const FORM_KEY_AAD = "anon.li:form-owner-key:v1";

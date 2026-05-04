@@ -136,12 +136,12 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export interface ApiResult<T> {
+interface ApiResult<T> {
   data: T;
   rateLimit?: RateLimitInfo;
 }
 
-export interface ApiListResult<T> {
+interface ApiListResult<T> {
   data: T[];
   total: number;
   rateLimit?: RateLimitInfo;

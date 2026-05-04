@@ -1,7 +1,7 @@
 {
   "name": "anonli",
-  "version": "1.0.1",
-  "description": "anon.li CLI - encrypted file drops and anonymous email aliases",
+  "version": "1.1.0",
+  "description": "anon.li CLI - encrypted file drops, forms and anonymous email aliases",
   "type": "module",
   "license": "AGPL-3.0",
   "author": "anon.li",
@@ -17,6 +17,7 @@
     "cli",
     "encrypted",
     "file-sharing",
+    "forms",
     "email",
     "alias",
     "privacy",

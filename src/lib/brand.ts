@@ -8,7 +8,7 @@ const LOGO = `
  | (_| | | | | (_) | | | |_| | |
   \\__,_|_| |_|\\___/|_| |_(_)_|_|`;
 
-export function printBanner(version: string): string {
+function printBanner(version: string): string {
   const logo = brandColor.multiline(LOGO.slice(1)); // trim leading newline
   const tagline = c.secondary(" Encrypted drops & anonymous aliases") + c.muted(` v${version}`);
 

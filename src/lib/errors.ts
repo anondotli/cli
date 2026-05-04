@@ -1,11 +1,9 @@
 // Fine-grained exit codes (F7)
-export const EXIT_SUCCESS = 0;
-export const EXIT_ERROR = 1;
-export const EXIT_AUTH = 2;
-export const EXIT_RATE_LIMIT = 3;
-export const EXIT_PLAN_LIMIT = 4;
+const EXIT_ERROR = 1;
+const EXIT_AUTH = 2;
+const EXIT_RATE_LIMIT = 3;
+const EXIT_PLAN_LIMIT = 4;
 export const EXIT_NOT_FOUND = 5;
-export const EXIT_VALIDATION = 6;
 
 export class CliError extends Error {
   constructor(
@@ -62,12 +60,5 @@ export class PlanLimitError extends CliError {
   constructor(message: string, public readonly suggestion: string) {
     super(message, EXIT_PLAN_LIMIT);
     this.name = "PlanLimitError";
-  }
-}
-
-export class ValidationError extends CliError {
-  constructor(message: string) {
-    super(message, EXIT_VALIDATION);
-    this.name = "ValidationError";
   }
 }

@@ -67,11 +67,27 @@ export const aliasNewCommand = new Command("new")
   .option("-l, --label <text>", "Vault-encrypted label for the alias")
   .option("--note <text>", "Encrypted private note for the alias")
   .option("--recipient <email>", "Recipient email to forward to")
+  .option(
+    "--recipient-id <id>",
+    "Recipient ID to forward to (repeat for multiple, max 10)",
+    (val: string, prev: string[] = []) => prev.concat(val),
+    [] as string[]
+  )
   .action(async (options) => {
     requireAuth();
 
     const domain = (options.domain as string) || "anon.li";
     const isCustom = !!options.custom;
+    const recipientIds = (options.recipientId as string[] | undefined) ?? [];
+
+    if (recipientIds.length > 10) {
+      ui.error("--recipient-id may be specified at most 10 times.");
+      process.exit(1);
+    }
+    if (options.recipient && recipientIds.length > 0) {
+      ui.error("Use either --recipient or --recipient-id, not both.");
+      process.exit(1);
+    }
 
     // B5: Validate custom alias format before API call
     if (isCustom) {
@@ -110,6 +126,7 @@ export const aliasNewCommand = new Command("new")
       const body: Record<string, unknown> = {
         domain,
         ...(options.recipient && { recipient_email: options.recipient }),
+        ...(recipientIds.length > 0 && { recipient_ids: recipientIds }),
       };
 
       const result = isCustom

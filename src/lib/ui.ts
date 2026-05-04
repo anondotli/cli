@@ -11,7 +11,7 @@ import { printHeader } from "./brand.js";
 import type { RateLimitInfo } from "../types/api.js";
 
 // Re-export theme for direct access from commands
-export { c, brandColor } from "./theme.js";
+export { c } from "./theme.js";
 
 // ─── Quiet Mode (U2) ──────────────────────────────────────
 
@@ -20,10 +20,6 @@ const UNLIMITED_SYMBOL = "∞";
 
 export function setQuiet(val: boolean): void {
   _quiet = val;
-}
-
-export function isQuiet(): boolean {
-  return _quiet;
 }
 
 // ─── JSON Output (U1) ─────────────────────────────────────
@@ -85,11 +81,6 @@ export function link(url: string): string {
 export function header(title: string): void {
   if (_quiet) return;
   console.log(printHeader(title));
-}
-
-export function divider(): void {
-  if (_quiet) return;
-  console.log(c.subtle("─".repeat(48)));
 }
 
 export function spacer(): void {
@@ -260,7 +251,7 @@ function isUnlimitedLimit(limit: number): boolean {
   return !Number.isFinite(limit) || limit < 0;
 }
 
-export function usageBar(used: number, limit: number, width = 12): string {
+function usageBar(used: number, limit: number, width = 12): string {
   if (isUnlimitedLimit(limit)) {
     return c.success("░".repeat(width));
   }

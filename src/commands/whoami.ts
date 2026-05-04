@@ -52,6 +52,14 @@ export const whoamiCommand = new Command("whoami")
       ui.alignedKeyValue("Expiry", ui.formatDays(d.limits.max_expiry_days), 14);
       ui.spacer();
 
+      // Vault status
+      ui.sectionTitle("Vault");
+      const vaultLabel = d.vault_configured
+        ? ui.c.success("configured")
+        : ui.c.muted("not configured");
+      ui.alignedKeyValue("Status", vaultLabel, 14);
+      ui.spacer();
+
       // API
       ui.showRateLimit(result.rateLimit);
     } catch (err) {

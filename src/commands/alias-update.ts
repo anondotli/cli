@@ -41,6 +41,14 @@ export const aliasUpdateCommand = new Command("update")
   .option("--note <text>", "Update encrypted private note")
   .option("--clear-label", "Clear encrypted label")
   .option("--clear-note", "Clear encrypted private note")
+  .option("--recipient <email>", "Forward to this recipient email")
+  .option(
+    "--recipient-id <id>",
+    "Forward to this recipient ID (repeat for multiple, max 10)",
+    (val: string, prev: string[] = []) => prev.concat(val),
+    [] as string[]
+  )
+  .option("--clear-recipients", "Remove all recipients (use the default)")
   .action(async (alias: string, options: {
     enable?: boolean;
     disable?: boolean;
@@ -48,8 +56,17 @@ export const aliasUpdateCommand = new Command("update")
     note?: string;
     clearLabel?: boolean;
     clearNote?: boolean;
+    recipient?: string;
+    recipientId?: string[];
+    clearRecipients?: boolean;
   }) => {
     requireAuth();
+
+    const recipientIds = options.recipientId ?? [];
+    const hasRecipientChange =
+      options.recipient !== undefined ||
+      recipientIds.length > 0 ||
+      !!options.clearRecipients;
 
     if (
       !options.enable &&
@@ -57,14 +74,27 @@ export const aliasUpdateCommand = new Command("update")
       options.label === undefined &&
       options.note === undefined &&
       !options.clearLabel &&
-      !options.clearNote
+      !options.clearNote &&
+      !hasRecipientChange
     ) {
-      ui.error("Provide at least one option: --enable, --disable, --label, --note, --clear-label, or --clear-note");
+      ui.error("Provide at least one option: --enable, --disable, --label, --note, --clear-label, --clear-note, --recipient, --recipient-id, or --clear-recipients");
       process.exit(1);
     }
 
     if (options.enable && options.disable) {
       ui.error("Cannot use both --enable and --disable");
+      process.exit(1);
+    }
+    if (recipientIds.length > 10) {
+      ui.error("--recipient-id may be specified at most 10 times.");
+      process.exit(1);
+    }
+    const recipientFlagCount =
+      (options.recipient !== undefined ? 1 : 0) +
+      (recipientIds.length > 0 ? 1 : 0) +
+      (options.clearRecipients ? 1 : 0);
+    if (recipientFlagCount > 1) {
+      ui.error("Use at most one of --recipient, --recipient-id, --clear-recipients.");
       process.exit(1);
     }
     validateMetadataOptions(options);
@@ -109,6 +139,15 @@ export const aliasUpdateCommand = new Command("update")
       if (options.clearNote) {
         body.encrypted_note = null;
       }
+      if (options.recipient !== undefined) {
+        body.recipient_email = options.recipient;
+      }
+      if (recipientIds.length > 0) {
+        body.recipient_ids = recipientIds;
+      }
+      if (options.clearRecipients) {
+        body.recipient_ids = [];
+      }
 
       spin = ui.spinner("Updating alias...");
       const result = await apiPatch<AliasItem>(
@@ -137,6 +176,15 @@ export const aliasUpdateCommand = new Command("update")
       }
       if (options.clearNote) {
         ui.info("Encrypted note cleared.");
+      }
+      if (options.recipient !== undefined) {
+        ui.info(`Forwarding to: ${ui.c.primary(options.recipient)}`);
+      }
+      if (recipientIds.length > 0) {
+        ui.info(`Forwarding to ${ui.c.primary(String(recipientIds.length))} recipient(s).`);
+      }
+      if (options.clearRecipients) {
+        ui.info("Recipients cleared (using default).");
       }
 
       ui.showRateLimit(result.rateLimit);

@@ -6,6 +6,7 @@ import {
   ARGON2_MEMORY,
   ARGON2_PARALLELISM,
   ARGON2_TIME,
+  FORM_KEY_AAD,
 } from "./constants.js";
 import {
   arrayBufferToBase64Url,
@@ -144,6 +145,50 @@ export async function wrapDropKeyWithVault(
   );
   const wrapped = await subtle.wrapKey("raw", keyToWrap, wrappingKey, "AES-KW");
   return arrayBufferToBase64Url(wrapped);
+}
+
+export async function unwrapDropKeyFromVault(
+  wrappedKey: string,
+  vault: UnlockedVault
+): Promise<string> {
+  const wrappingKey = await getVaultWrappingKey(vault.vaultKey);
+  const aesKey = await subtle.unwrapKey(
+    "raw",
+    toBufferSource(base64UrlToArrayBuffer(wrappedKey)),
+    wrappingKey,
+    "AES-KW",
+    AES_GCM_ALGORITHM,
+    true,
+    ["encrypt", "decrypt"]
+  );
+  const raw = await subtle.exportKey("raw", aesKey);
+  return arrayBufferToBase64Url(raw);
+}
+
+// Wrap an arbitrary-size payload (e.g. a PKCS#8 private key) under the vault
+// key using AES-GCM. Layout is [iv | ciphertext] packed and base64url-encoded.
+const FORM_KEY_IV_BYTES = 12;
+const FORM_KEY_AAD_BYTES = new TextEncoder().encode(FORM_KEY_AAD);
+
+export async function wrapVaultPayload(
+  data: ArrayBuffer | Uint8Array,
+  vault: UnlockedVault
+): Promise<string> {
+  const iv = webcrypto.getRandomValues(new Uint8Array(FORM_KEY_IV_BYTES));
+  const cipher = await subtle.encrypt(
+    {
+      name: "AES-GCM",
+      iv: toBufferSource(iv),
+      additionalData: toBufferSource(FORM_KEY_AAD_BYTES),
+    },
+    vault.vaultKey,
+    toBufferSource(data)
+  );
+  const cipherBytes = new Uint8Array(cipher);
+  const packed = new Uint8Array(iv.byteLength + cipherBytes.byteLength);
+  packed.set(iv, 0);
+  packed.set(cipherBytes, iv.byteLength);
+  return arrayBufferToBase64Url(packed);
 }
 
 function aliasMetadataAad(aliasId: string, field: VaultTextField): Uint8Array {

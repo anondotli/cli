@@ -6,6 +6,7 @@ import { dropCommand } from "./commands/drop.js";
 import { aliasCommand } from "./commands/alias.js";
 import { recipientCommand } from "./commands/recipient.js";
 import { domainCommand } from "./commands/domain.js";
+import { formCommand } from "./commands/form.js";
 import { apikeyCommand } from "./commands/apikey.js";
 import { configCommand } from "./commands/config-cmd.js";
 import { updateCommand } from "./commands/update.js";
@@ -38,6 +39,7 @@ program.addCommand(dropCommand);
 program.addCommand(aliasCommand);
 program.addCommand(recipientCommand);
 program.addCommand(domainCommand);
+program.addCommand(formCommand);
 program.addCommand(apikeyCommand);
 program.addCommand(configCommand);
 program.addCommand(updateCommand);
@@ -67,6 +69,7 @@ const AUTH_EXEMPT = new Set([
   "drop download",
   "drop dl",
   "drop share",
+  "form info",
 ]);
 
 // Auto-auth: prompt for API key when missing before authenticated commands
